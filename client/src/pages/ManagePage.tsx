@@ -9,6 +9,8 @@ export default function ManagePage() {
   const [showBatch, setShowBatch] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [bonusId, setBonusId] = useState<string | null>(null);
+  const [bonusScore, setBonusScore] = useState('');
 
 
   useEffect(() => {
@@ -63,6 +65,24 @@ export default function ManagePage() {
     try {
       await api.updateMember(editingId, { name: editName.trim() });
       setEditingId(null);
+      loadMembers();
+    } catch (e: any) {
+      alert(e.message);
+    }
+  };
+
+  const startBonus = (m: Member) => {
+    setBonusId(m.id);
+    setBonusScore('');
+  };
+
+  const saveBonus = async () => {
+    if (!bonusId) return;
+    const bonus = parseInt(bonusScore);
+    if (isNaN(bonus) || bonus <= 0) { alert('请输入大于0的加分数值'); return; }
+    try {
+      await api.bonusScore(bonusId, bonus);
+      setBonusId(null);
       loadMembers();
     } catch (e: any) {
       alert(e.message);
@@ -202,6 +222,27 @@ export default function ManagePage() {
                     ✕
                   </button>
                 </div>
+              ) : bonusId === m.id ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{m.name}</div>
+                  <span style={{ fontSize: 13, color: 'var(--text-light)' }}>加分：</span>
+                  <input
+                    className="input"
+                    type="number"
+                    placeholder="输入分数"
+                    value={bonusScore}
+                    onChange={e => setBonusScore(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && saveBonus()}
+                    autoFocus
+                    style={{ width: 80 }}
+                  />
+                  <button className="btn-secondary" onClick={saveBonus} style={{ padding: '8px 16px' }}>
+                    ✓
+                  </button>
+                  <button className="btn-secondary" onClick={() => setBonusId(null)} style={{ padding: '8px 16px' }}>
+                    ✕
+                  </button>
+                </div>
               ) : (
                 <>
                   <div style={{ flex: 1 }}>
@@ -210,6 +251,13 @@ export default function ManagePage() {
                       积分 {m.total_score} · 发言 {m.speak_count} 次
                     </div>
                   </div>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => startBonus(m)}
+                    style={{ padding: '6px 14px', fontSize: 12 }}
+                  >
+                    ⭐ 加分
+                  </button>
                   <button
                     className="btn-secondary"
                     onClick={() => startEdit(m)}

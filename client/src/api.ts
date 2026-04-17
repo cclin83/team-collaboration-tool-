@@ -62,4 +62,6 @@ export const api = {
     request('/history'),
   resetScores: (): Promise<void> =>
     request('/reset-scores', { method: 'POST' }),
+  bonusScore: (id: string, bonus: number): Promise<Member> =>
+    request(`/members/${id}/bonus`, { method: 'POST', body: JSON.stringify({ bonus }) }),
 };

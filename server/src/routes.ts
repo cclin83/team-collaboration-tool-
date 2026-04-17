@@ -310,13 +310,13 @@ router.post('/reset-scores', async (_req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-// ============ Update member score ============
-router.put('/members/:id/score', async (req: Request, res: Response) => {
+// ============ Bonus score for a member ============
+router.post('/members/:id/bonus', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { total_score } = req.body;
+  const { bonus } = req.body;
 
-  if (total_score === undefined || typeof total_score !== 'number') {
-    res.status(400).json({ error: 'total_score is required and must be a number' });
+  if (bonus === undefined || typeof bonus !== 'number' || bonus <= 0) {
+    res.status(400).json({ error: 'bonus is required and must be a positive number' });
     return;
   }
 
@@ -330,7 +330,7 @@ router.put('/members/:id/score', async (req: Request, res: Response) => {
 
   const { error } = await supabase
     .from('members')
-    .update({ total_score })
+    .update({ total_score: member.total_score + bonus })
     .eq('id', id);
 
   if (error) { res.status(500).json({ error: error.message }); return; }

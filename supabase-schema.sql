@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS members (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  avatar_color TEXT NOT NULL DEFAULT '#FF6B35',
+  total_score INTEGER NOT NULL DEFAULT 0,
+  speak_count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS speak_records (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  encouragement TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);

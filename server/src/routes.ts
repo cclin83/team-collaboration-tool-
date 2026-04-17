@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import db from './database';
+import { supabase } from './database';
 import { getRandomScore, getRandomEncouragement } from './encouragements';
 
 const router = Router();
@@ -8,92 +8,130 @@ const router = Router();
 // ============ Members ============
 
 // Get all members
-router.get('/members', (_req: Request, res: Response) => {
-  const members = db.prepare('SELECT * FROM members ORDER BY total_score DESC').all();
-  res.json(members);
+router.get('/members', async (_req: Request, res: Response) => {
+  const { data, error } = await supabase
+    .from('members')
+    .select('*')
+    .order('total_score', { ascending: false });
+
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.json(data);
 });
 
 // Add a member
-router.post('/members', (req: Request, res: Response) => {
+router.post('/members', async (req: Request, res: Response) => {
   const { name, avatar_color } = req.body;
-  if (!name) {
-    res.status(400).json({ error: 'Name is required' });
-    return;
-  }
+  if (!name) { res.status(400).json({ error: 'Name is required' }); return; }
+
   const id = uuidv4();
   const color = avatar_color || getRandomColor();
-  db.prepare('INSERT INTO members (id, name, avatar_color) VALUES (?, ?, ?)').run(id, name, color);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+
+  const { error } = await supabase
+    .from('members')
+    .insert({ id, name, avatar_color: color });
+
+  if (error) { res.status(500).json({ error: error.message }); return; }
+
+  const { data: member } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', id)
+    .single();
+
   res.status(201).json(member);
 });
 
 // Update a member
-router.put('/members/:id', (req: Request, res: Response) => {
+router.put('/members/:id', async (req: Request, res: Response) => {
   const { name, avatar_color } = req.body;
   const { id } = req.params;
-  db.prepare('UPDATE members SET name = COALESCE(?, name), avatar_color = COALESCE(?, avatar_color) WHERE id = ?')
-    .run(name, avatar_color, id);
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
-  if (!member) {
-    res.status(404).json({ error: 'Member not found' });
-    return;
-  }
+
+  const updates: any = {};
+  if (name !== undefined) updates.name = name;
+  if (avatar_color !== undefined) updates.avatar_color = avatar_color;
+
+  const { error } = await supabase
+    .from('members')
+    .update(updates)
+    .eq('id', id);
+
+  if (error) { res.status(500).json({ error: error.message }); return; }
+
+  const { data: member } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (!member) { res.status(404).json({ error: 'Member not found' }); return; }
   res.json(member);
 });
 
 // Delete a member
-router.delete('/members/:id', (req: Request, res: Response) => {
+router.delete('/members/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  db.prepare('DELETE FROM speak_records WHERE member_id = ?').run(id);
-  const result = db.prepare('DELETE FROM members WHERE id = ?').run(id);
-  if (result.changes === 0) {
-    res.status(404).json({ error: 'Member not found' });
-    return;
-  }
+
+  await supabase.from('speak_records').delete().eq('member_id', id);
+
+  const { data, error } = await supabase
+    .from('members')
+    .delete()
+    .eq('id', id)
+    .select();
+
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  if (!data || data.length === 0) { res.status(404).json({ error: 'Member not found' }); return; }
   res.json({ success: true });
 });
 
 // Batch import members
-router.post('/members/batch', (req: Request, res: Response) => {
+router.post('/members/batch', async (req: Request, res: Response) => {
   const { names } = req.body;
   if (!Array.isArray(names) || names.length === 0) {
     res.status(400).json({ error: 'Names array is required' });
     return;
   }
-  const insert = db.prepare('INSERT INTO members (id, name, avatar_color) VALUES (?, ?, ?)');
-  const insertMany = db.transaction((nameList: string[]) => {
-    const added = [];
-    for (const name of nameList) {
-      if (name.trim()) {
-        const id = uuidv4();
-        const color = getRandomColor();
-        insert.run(id, name.trim(), color);
-        added.push({ id, name: name.trim(), avatar_color: color, total_score: 0, speak_count: 0 });
-      }
-    }
-    return added;
-  });
-  const result = insertMany(names);
+
+  const rows = names
+    .filter((n: string) => n.trim())
+    .map((n: string) => ({
+      id: uuidv4(),
+      name: n.trim(),
+      avatar_color: getRandomColor(),
+    }));
+
+  const { error } = await supabase.from('members').insert(rows);
+  if (error) { res.status(500).json({ error: error.message }); return; }
+
+  const result = rows.map(r => ({ ...r, total_score: 0, speak_count: 0 }));
   res.status(201).json(result);
 });
 
 // ============ Draw (Random Pick) ============
 
-router.post('/draw', (_req: Request, res: Response) => {
-  const members = db.prepare('SELECT * FROM members').all() as any[];
-  if (members.length === 0) {
+router.post('/draw', async (_req: Request, res: Response) => {
+  const { data: members, error } = await supabase
+    .from('members')
+    .select('*');
+
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  if (!members || members.length === 0) {
     res.status(400).json({ error: 'No members available' });
     return;
   }
 
   // Get today's speak records for weight calculation
   const today = new Date().toISOString().split('T')[0];
-  const todayRecords = db.prepare(
-    "SELECT member_id, COUNT(*) as count FROM speak_records WHERE date(created_at) = ? GROUP BY member_id"
-  ).all(today) as any[];
+  const { data: todayRecords } = await supabase
+    .from('speak_records')
+    .select('member_id')
+    .gte('created_at', `${today}T00:00:00`)
+    .lt('created_at', `${today}T23:59:59.999`);
 
   const todaySpeakMap = new Map<string, number>();
-  todayRecords.forEach((r: any) => todaySpeakMap.set(r.member_id, r.count));
+  (todayRecords || []).forEach((r: any) => {
+    todaySpeakMap.set(r.member_id, (todaySpeakMap.get(r.member_id) || 0) + 1);
+  });
 
   // Calculate weights: base weight 1.0, halved for each time spoken today
   const weighted = members.map(m => {
@@ -105,7 +143,6 @@ router.post('/draw', (_req: Request, res: Response) => {
   // Check if all have spoken - reset weights if so
   const allSpoken = weighted.every(w => w.weight < 1);
   if (allSpoken) {
-    // Find minimum speaks, give those people higher weight
     const minSpeaks = Math.min(...weighted.map(w => todaySpeakMap.get(w.member.id) || 0));
     weighted.forEach(w => {
       const timesSpoken = todaySpeakMap.get(w.member.id) || 0;
@@ -125,7 +162,6 @@ router.post('/draw', (_req: Request, res: Response) => {
     }
   }
 
-  // Return all members for the animation, with the selected one marked
   res.json({
     selected,
     allMembers: members.map(m => ({ id: m.id, name: m.name, avatar_color: m.avatar_color })),
@@ -134,84 +170,139 @@ router.post('/draw', (_req: Request, res: Response) => {
 
 // ============ Score ============
 
-router.post('/score', (req: Request, res: Response) => {
+router.post('/score', async (req: Request, res: Response) => {
   const { member_id } = req.body;
-  if (!member_id) {
-    res.status(400).json({ error: 'member_id is required' });
-    return;
-  }
+  if (!member_id) { res.status(400).json({ error: 'member_id is required' }); return; }
 
-  const member = db.prepare('SELECT * FROM members WHERE id = ?').get(member_id) as any;
-  if (!member) {
-    res.status(404).json({ error: 'Member not found' });
-    return;
-  }
+  const { data: member } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', member_id)
+    .single();
+
+  if (!member) { res.status(404).json({ error: 'Member not found' }); return; }
 
   const score = getRandomScore();
   const encouragement = getRandomEncouragement();
   const id = uuidv4();
 
-  db.prepare('INSERT INTO speak_records (id, member_id, score, encouragement) VALUES (?, ?, ?, ?)')
-    .run(id, member_id, score, encouragement);
+  const { error: insertErr } = await supabase
+    .from('speak_records')
+    .insert({ id, member_id, score, encouragement });
 
-  db.prepare('UPDATE members SET total_score = total_score + ?, speak_count = speak_count + 1 WHERE id = ?')
-    .run(score, member_id);
+  if (insertErr) { res.status(500).json({ error: insertErr.message }); return; }
 
-  const updated = db.prepare('SELECT * FROM members WHERE id = ?').get(member_id);
+  const { error: updateErr } = await supabase
+    .from('members')
+    .update({
+      total_score: member.total_score + score,
+      speak_count: member.speak_count + 1,
+    })
+    .eq('id', member_id);
+
+  if (updateErr) { res.status(500).json({ error: updateErr.message }); return; }
+
+  const { data: updated } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', member_id)
+    .single();
 
   res.json({ score, encouragement, member: updated });
 });
 
 // ============ Leaderboard ============
 
-router.get('/leaderboard', (req: Request, res: Response) => {
+router.get('/leaderboard', async (req: Request, res: Response) => {
   const period = req.query.period as string || 'all';
 
-  let dateFilter = '';
-  if (period === 'week') {
-    dateFilter = "WHERE date(sr.created_at) >= date('now', '-7 days')";
-  } else if (period === 'month') {
-    dateFilter = "WHERE date(sr.created_at) >= date('now', '-30 days')";
-  }
-
   if (period === 'all') {
-    const members = db.prepare(
-      'SELECT * FROM members ORDER BY total_score DESC'
-    ).all();
-    res.json(members);
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .order('total_score', { ascending: false });
+
+    if (error) { res.status(500).json({ error: error.message }); return; }
+    res.json(data);
   } else {
-    const members = db.prepare(`
-      SELECT m.id, m.name, m.avatar_color, m.created_at,
-        COALESCE(SUM(sr.score), 0) as total_score,
-        COUNT(sr.id) as speak_count
-      FROM members m
-      LEFT JOIN speak_records sr ON m.id = sr.member_id
-        ${dateFilter.replace('WHERE', 'AND')}
-      GROUP BY m.id
-      ORDER BY total_score DESC
-    `).all();
-    res.json(members);
+    let daysAgo = 7;
+    if (period === 'month') daysAgo = 30;
+
+    const since = new Date();
+    since.setDate(since.getDate() - daysAgo);
+    const sinceStr = since.toISOString();
+
+    // Get speak records within the period
+    const { data: records, error: recErr } = await supabase
+      .from('speak_records')
+      .select('member_id, score')
+      .gte('created_at', sinceStr);
+
+    if (recErr) { res.status(500).json({ error: recErr.message }); return; }
+
+    // Aggregate scores per member
+    const scoreMap = new Map<string, { total_score: number; speak_count: number }>();
+    (records || []).forEach((r: any) => {
+      const existing = scoreMap.get(r.member_id) || { total_score: 0, speak_count: 0 };
+      existing.total_score += r.score;
+      existing.speak_count += 1;
+      scoreMap.set(r.member_id, existing);
+    });
+
+    // Get all members
+    const { data: members, error: memErr } = await supabase
+      .from('members')
+      .select('*');
+
+    if (memErr) { res.status(500).json({ error: memErr.message }); return; }
+
+    const result = (members || []).map(m => ({
+      ...m,
+      total_score: scoreMap.get(m.id)?.total_score || 0,
+      speak_count: scoreMap.get(m.id)?.speak_count || 0,
+    }));
+
+    result.sort((a, b) => b.total_score - a.total_score);
+    res.json(result);
   }
 });
 
 // ============ History ============
 
-router.get('/history', (_req: Request, res: Response) => {
-  const records = db.prepare(`
-    SELECT sr.*, m.name as member_name, m.avatar_color
-    FROM speak_records sr
-    JOIN members m ON sr.member_id = m.id
-    ORDER BY sr.created_at DESC
-    LIMIT 100
-  `).all();
+router.get('/history', async (_req: Request, res: Response) => {
+  const { data, error } = await supabase
+    .from('speak_records')
+    .select('*, members(name, avatar_color)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) { res.status(500).json({ error: error.message }); return; }
+
+  // Flatten the joined data to match the original format
+  const records = (data || []).map((r: any) => ({
+    id: r.id,
+    member_id: r.member_id,
+    score: r.score,
+    encouragement: r.encouragement,
+    created_at: r.created_at,
+    member_name: r.members?.name,
+    avatar_color: r.members?.avatar_color,
+  }));
+
   res.json(records);
 });
 
 // ============ Reset today's weights ============
-router.post('/reset-weights', (_req: Request, res: Response) => {
-  // Delete today's records to reset weights
+router.post('/reset-weights', async (_req: Request, res: Response) => {
   const today = new Date().toISOString().split('T')[0];
-  db.prepare("DELETE FROM speak_records WHERE date(created_at) = ?").run(today);
+
+  const { error } = await supabase
+    .from('speak_records')
+    .delete()
+    .gte('created_at', `${today}T00:00:00`)
+    .lt('created_at', `${today}T23:59:59.999`);
+
+  if (error) { res.status(500).json({ error: error.message }); return; }
   res.json({ success: true });
 });
 

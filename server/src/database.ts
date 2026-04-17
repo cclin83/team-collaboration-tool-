@@ -1,33 +1,13 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-// Use /var/data for Render persistent disk, fallback to local
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
-const DB_PATH = path.join(DATA_DIR, 'data.db');
+dotenv.config();
 
-const db = new Database(DB_PATH);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Enable WAL mode for better concurrent performance
-db.pragma('journal_mode = WAL');
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS members (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    avatar_color TEXT NOT NULL DEFAULT '#FF6B35',
-    total_score INTEGER NOT NULL DEFAULT 0,
-    speak_count INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS speak_records (
-    id TEXT PRIMARY KEY,
-    member_id TEXT NOT NULL,
-    score INTEGER NOT NULL,
-    encouragement TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
-  );
-`);
-
-export default db;
+export const supabase = createClient(supabaseUrl, supabaseKey);

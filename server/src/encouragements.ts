@@ -1,5 +1,5 @@
 // Lucky/fun score pool
-export const SCORE_POOL = [6, 8, 18, 66, 68, 88, 99, 100, 168, 520, 666, 888, 999];
+// Score range: 1-20
 
 // Encouragement messages
 export const ENCOURAGEMENTS = [
@@ -26,7 +26,7 @@ export const ENCOURAGEMENTS = [
 ];
 
 export function getRandomScore(): number {
-  return SCORE_POOL[Math.floor(Math.random() * SCORE_POOL.length)];
+  return Math.floor(Math.random() * 20) + 1;
 }
 
 export function getRandomEncouragement(): string {

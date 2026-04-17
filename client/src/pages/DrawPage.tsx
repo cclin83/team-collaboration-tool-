@@ -12,9 +12,6 @@ export default function DrawPage() {
   const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showBonusInput, setShowBonusInput] = useState(false);
-  const [bonusValue, setBonusValue] = useState('');
-  const [bonusGiven, setBonusGiven] = useState(false);
   const [voluntaryMemberId, setVoluntaryMemberId] = useState('');
   const [voluntaryResult, setVoluntaryResult] = useState<ScoreResult | null>(null);
   const [allMembers, setAllMembers] = useState<Member[]>([]);
@@ -135,27 +132,6 @@ export default function DrawPage() {
     }
   }, [voluntaryMemberId, allMembers]);
 
-  const giveBonus = useCallback(async () => {
-    if (!selected) return;
-    const bonus = parseInt(bonusValue);
-    if (isNaN(bonus) || bonus <= 0) { alert('请输入大于0的加分数值'); return; }
-    try {
-      const updated = await api.bonusScore(selected.id, bonus);
-      if (scoreResult) {
-        setScoreResult({ ...scoreResult, member: updated });
-      }
-      if (voluntaryResult) {
-        setVoluntaryResult({ ...voluntaryResult, member: updated });
-      }
-      setBonusGiven(true);
-      setShowBonusInput(false);
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 3000);
-    } catch {
-      alert('加分失败');
-    }
-  }, [selected, bonusValue, scoreResult, voluntaryResult]);
-
   const reset = () => {
     setPhase('idle');
     setSelected(null);
@@ -164,9 +140,6 @@ export default function DrawPage() {
     setVoluntaryMemberId('');
     setDisplayName('');
     setShowConfetti(false);
-    setShowBonusInput(false);
-    setBonusValue('');
-    setBonusGiven(false);
   };
 
   return (
@@ -346,15 +319,6 @@ export default function DrawPage() {
               >
                 {selected?.name} 当前总积分：{(scoreResult || voluntaryResult)!.member.total_score}
               </motion.div>
-              {bonusGiven && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  style={{ fontSize: 18, color: '#2EC4B6', fontWeight: 700, marginTop: 8 }}
-                >
-                  ⭐ 已额外加 {bonusValue} 分！
-                </motion.div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -434,56 +398,17 @@ export default function DrawPage() {
         )}
 
         {(phase === 'scored' || phase === 'voluntaryScored') && (
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {!bonusGiven && !showBonusInput && (
-              <motion.button
-                className="btn-secondary"
-                onClick={() => { setShowBonusInput(true); setBonusValue(''); }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
-              >
-                ⭐ 额外加分
-              </motion.button>
-            )}
-            {showBonusInput && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                style={{ display: 'flex', gap: 8, alignItems: 'center' }}
-              >
-                <input
-                  className="input"
-                  type="number"
-                  placeholder="加分数值"
-                  value={bonusValue}
-                  onChange={e => setBonusValue(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && giveBonus()}
-                  autoFocus
-                  style={{ width: 100 }}
-                />
-                <button className="btn-primary" onClick={giveBonus} style={{ padding: '10px 20px' }}>
-                  确认
-                </button>
-                <button className="btn-secondary" onClick={() => setShowBonusInput(false)} style={{ padding: '10px 20px' }}>
-                  取消
-                </button>
-              </motion.div>
-            )}
-            <motion.button
-              className="btn-primary"
-              onClick={reset}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-            >
-              🎲 继续抽人
-            </motion.button>
-          </div>
+          <motion.button
+            className="btn-primary"
+            onClick={reset}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1 }}
+          >
+            🎲 继续抽人
+          </motion.button>
         )}
 
         {phase === 'spinning' && (

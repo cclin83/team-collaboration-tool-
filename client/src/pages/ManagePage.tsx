@@ -9,8 +9,7 @@ export default function ManagePage() {
   const [showBatch, setShowBatch] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [editingScoreId, setEditingScoreId] = useState<string | null>(null);
-  const [editScore, setEditScore] = useState('');
+
 
   useEffect(() => {
     loadMembers();
@@ -74,24 +73,6 @@ export default function ManagePage() {
     if (!confirm('确定要清零所有人的积分吗？此操作不可撤销！')) return;
     try {
       await api.resetScores();
-      loadMembers();
-    } catch (e: any) {
-      alert(e.message);
-    }
-  };
-
-  const startEditScore = (m: Member) => {
-    setEditingScoreId(m.id);
-    setEditScore(String(m.total_score));
-  };
-
-  const saveScore = async () => {
-    if (!editingScoreId) return;
-    const score = parseInt(editScore);
-    if (isNaN(score) || score < 0) { alert('请输入有效的积分数值'); return; }
-    try {
-      await api.updateMemberScore(editingScoreId, score);
-      setEditingScoreId(null);
       loadMembers();
     } catch (e: any) {
       alert(e.message);
@@ -221,26 +202,6 @@ export default function ManagePage() {
                     ✕
                   </button>
                 </div>
-              ) : editingScoreId === m.id ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontWeight: 700, fontSize: 16 }}>{m.name}</div>
-                  <span style={{ fontSize: 13, color: 'var(--text-light)' }}>积分：</span>
-                  <input
-                    className="input"
-                    type="number"
-                    value={editScore}
-                    onChange={e => setEditScore(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && saveScore()}
-                    autoFocus
-                    style={{ width: 80 }}
-                  />
-                  <button className="btn-secondary" onClick={saveScore} style={{ padding: '8px 16px' }}>
-                    ✓
-                  </button>
-                  <button className="btn-secondary" onClick={() => setEditingScoreId(null)} style={{ padding: '8px 16px' }}>
-                    ✕
-                  </button>
-                </div>
               ) : (
                 <>
                   <div style={{ flex: 1 }}>
@@ -249,13 +210,6 @@ export default function ManagePage() {
                       积分 {m.total_score} · 发言 {m.speak_count} 次
                     </div>
                   </div>
-                  <button
-                    className="btn-secondary"
-                    onClick={() => startEditScore(m)}
-                    style={{ padding: '6px 14px', fontSize: 12 }}
-                  >
-                    🎯 改分
-                  </button>
                   <button
                     className="btn-secondary"
                     onClick={() => startEdit(m)}

@@ -1,0 +1,20 @@
+// The Dev Container format allows you to configure your environment. At the heart of it
+// is a Docker image or Dockerfile which controls the tools available in your environment.
+//
+// See https://aka.ms/devcontainer.json for more information.
+{
+	"name": "Ona",
+	"image": "eu.repository.roche.com/cde-gitpod-docker-prd-l/ona-base:2.0",
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "20"
+		}
+	},
+	"forwardPorts": [3001],
+	"portsAttributes": {
+		"3001": {
+			"label": "Team Speak Booster",
+			"onAutoForward": "notify"
+		}
+	}
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+.env
+.env.local
+*.log
+.DS_Store

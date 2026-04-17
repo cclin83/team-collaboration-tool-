@@ -292,6 +292,58 @@ router.get('/history', async (_req: Request, res: Response) => {
   res.json(records);
 });
 
+// ============ Reset all scores ============
+router.post('/reset-scores', async (_req: Request, res: Response) => {
+  const { error: recErr } = await supabase
+    .from('speak_records')
+    .delete()
+    .neq('id', '');
+
+  if (recErr) { res.status(500).json({ error: recErr.message }); return; }
+
+  const { error: memErr } = await supabase
+    .from('members')
+    .update({ total_score: 0, speak_count: 0 })
+    .neq('id', '');
+
+  if (memErr) { res.status(500).json({ error: memErr.message }); return; }
+  res.json({ success: true });
+});
+
+// ============ Update member score ============
+router.put('/members/:id/score', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { total_score } = req.body;
+
+  if (total_score === undefined || typeof total_score !== 'number') {
+    res.status(400).json({ error: 'total_score is required and must be a number' });
+    return;
+  }
+
+  const { data: member } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (!member) { res.status(404).json({ error: 'Member not found' }); return; }
+
+  const { error } = await supabase
+    .from('members')
+    .update({ total_score })
+    .eq('id', id);
+
+  if (error) { res.status(500).json({ error: error.message }); return; }
+
+  const { data: updated } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  res.json(updated);
+});
+
 // ============ Reset today's weights ============
 router.post('/reset-weights', async (_req: Request, res: Response) => {
   const today = new Date().toISOString().split('T')[0];

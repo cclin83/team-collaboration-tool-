@@ -60,4 +60,8 @@ export const api = {
     request(`/leaderboard?period=${period}`),
   getHistory: (): Promise<SpeakRecord[]> =>
     request('/history'),
+  resetScores: (): Promise<void> =>
+    request('/reset-scores', { method: 'POST' }),
+  updateMemberScore: (id: string, total_score: number): Promise<Member> =>
+    request(`/members/${id}/score`, { method: 'PUT', body: JSON.stringify({ total_score }) }),
 };

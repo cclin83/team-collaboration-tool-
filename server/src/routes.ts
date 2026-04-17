@@ -297,14 +297,14 @@ router.post('/reset-scores', async (_req: Request, res: Response) => {
   const { error: recErr } = await supabase
     .from('speak_records')
     .delete()
-    .neq('id', '');
+    .not('id', 'is', null);
 
   if (recErr) { res.status(500).json({ error: recErr.message }); return; }
 
   const { error: memErr } = await supabase
     .from('members')
     .update({ total_score: 0, speak_count: 0 })
-    .neq('id', '');
+    .not('id', 'is', null);
 
   if (memErr) { res.status(500).json({ error: memErr.message }); return; }
   res.json({ success: true });

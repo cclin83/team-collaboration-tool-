@@ -82,7 +82,7 @@ export default function ManagePage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">👥 同事管理</h1>
+      <h1 className="page-title">👥 管理人员</h1>
 
       {/* Add single member */}
       <div className="card">

@@ -14,6 +14,9 @@ RUN cd client && npm ci
 COPY client/ ./client/
 RUN cd client && npx vite build
 
+# Verify build output
+RUN ls -la /app/client/dist/ && ls -la /app/server/dist/
+
 # --- Production stage ---
 FROM node:20-slim
 
@@ -24,6 +27,9 @@ RUN cd server && npm ci --production
 
 COPY --from=builder /app/server/dist ./server/dist
 COPY --from=builder /app/client/dist ./client/dist
+
+# Verify files exist in production stage
+RUN ls -la /app/client/dist/ && ls -la /app/server/dist/
 
 ENV PORT=3001
 EXPOSE 3001

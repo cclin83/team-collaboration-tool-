@@ -134,9 +134,11 @@ router.post('/draw', async (_req: Request, res: Response) => {
   });
 
   // Calculate weights: base weight 1.0, halved for each time spoken today
+  // "Jie Lin" has a much lower base weight
   const weighted = members.map(m => {
     const timesSpoken = todaySpeakMap.get(m.id) || 0;
-    const weight = Math.pow(0.5, timesSpoken);
+    const baseWeight = m.name === 'Jie Lin' ? 0.05 : 1.0;
+    const weight = baseWeight * Math.pow(0.5, timesSpoken);
     return { member: m, weight };
   });
 

@@ -2,14 +2,16 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
+# Force development mode during build so devDependencies are installed
+ENV NODE_ENV=development
+
 # Build server
 COPY server/package*.json ./server/
 RUN cd server && npm ci
 COPY server/ ./server/
 RUN cd server && npx tsc
 
-# Build client - bust cache with ARG
-ARG CACHEBUST=1
+# Build client
 COPY client/package*.json ./client/
 RUN cd client && npm ci
 COPY client/ ./client/
@@ -19,6 +21,8 @@ RUN cd client && npx vite build
 FROM node:20-slim
 
 WORKDIR /app
+
+ENV NODE_ENV=production
 
 COPY server/package*.json ./server/
 RUN cd server && npm ci --production

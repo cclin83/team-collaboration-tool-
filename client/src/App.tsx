@@ -14,7 +14,7 @@ function App() {
           🏆 排行榜
         </NavLink>
         <NavLink to="/manage" className={({ isActive }) => isActive ? 'active' : ''}>
-          👥 管理
+          👥 管理人员
         </NavLink>
       </nav>
       <Routes>
